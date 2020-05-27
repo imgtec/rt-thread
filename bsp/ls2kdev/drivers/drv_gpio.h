@@ -13,7 +13,7 @@
 #define __DRV_GPIO_H__
 
 
-int hw_pin_init(void);
+int loongson_pin_init(void);
 
 
 #endif
