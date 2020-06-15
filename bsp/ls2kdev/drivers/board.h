@@ -20,5 +20,6 @@ extern unsigned char __bss_end;
 #define RT_HW_HEAP_END      (void*)(RT_HW_HEAP_BEGIN + 64 * 1024 * 1024)
 
 void rt_hw_board_init(void);
+void rt_hw_clock_init(void);
 
 #endif

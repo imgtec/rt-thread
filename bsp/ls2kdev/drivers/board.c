@@ -95,4 +95,6 @@ void rt_hw_board_init(void)
 
     rt_kprintf("Current SR: 0x%08x\n", read_c0_status());
 
+    rt_hw_clock_init();
+
 }
