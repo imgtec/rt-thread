@@ -57,4 +57,5 @@ else:
 
 DUMP_ACTION = OBJDUMP + ' -D -S $TARGET > rtt.asm\n'
 READELF_ACTION = READELF + ' -a $TARGET > rtt.map\n'
-POST_ACTION = OBJCPY + ' -O binary $TARGET rtthread.bin\n' + SIZE + ' $TARGET \n'
+POST_ACTION = 'cp rtthread.elf /var/lib/tftpboot/rtthread2.elf'
+
