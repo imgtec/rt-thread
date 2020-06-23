@@ -43,12 +43,10 @@ typedef struct rtctime rtctime_t;
 
 void pr_time(struct tm *time)
 {
-    rt_kprintf(" tm_sec: [%d]\n", time->tm_sec);
-    rt_kprintf(" tm_min: [%d]\n", time->tm_min);
-    rt_kprintf("tm_hour: [%d]\n", time->tm_hour);
-    rt_kprintf("tm_mday: [%d]\n", time->tm_mday);
-    rt_kprintf(" tm_mon: [%d]\n", time->tm_mon);
-    rt_kprintf("tm_year: [%d]\n", time->tm_year);
+    rt_kprintf("tm_year - tm_mon - tm_mday %d-%d-%d\n", 
+                time->tm_year, time->tm_mon, time->tm_mday);
+    rt_kprintf("tm_hour:tm_min:tm_sec [%d:%d:%d] \n", 
+                time->tm_hour, time->tm_min, time->tm_sec);
 }
 
 rtctime_t mkrtctime(struct tm *tm)
@@ -103,8 +101,6 @@ struct tm *localrtctime(const rtctime_t *rtctp)
     return &time;
 }
 
-
-
 void hw_rtc_dump(void)
 {
     rt_uint32_t t;
@@ -142,6 +138,8 @@ static rt_err_t rt_rtc_ioctl(rt_device_t dev, int cmd, void *args)
 {
     rt_err_t err = RT_ENOSYS;
 
+    static int count = 0;
+
     struct loongson_rtc *hw_rtc;
     rtctime_t rtctm;
 
@@ -154,6 +152,13 @@ static rt_err_t rt_rtc_ioctl(rt_device_t dev, int cmd, void *args)
     hw_rtc = dev->user_data;
 
     t = (time_t *)args;
+    time = *localtime(t); 
+    pr_time(&time);
+
+    count++;
+    rt_kprintf("cmd: [%d], count: [%8d]\n", cmd, count);
+    return RT_EOK;
+    
 
     switch (cmd) {
 
