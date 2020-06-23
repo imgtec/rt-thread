@@ -9,7 +9,7 @@ export __bd=$PWD
 alias bd='cd ${__bd}'
 alias BD='__bd=$PWD'
 
-alias m='cd bsp/ls2kdev/'
+alias m='cd ${__bd}/bsp/ls2kdev/'
 alias c='scons'
 
 

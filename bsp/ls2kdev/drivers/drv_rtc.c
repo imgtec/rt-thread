@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright 2020, Du Huanpeng <548708880@qq.com>
  */
 
@@ -37,46 +37,21 @@ struct loongson_rtc {
 struct rtctime {
     rt_uint32_t sys_toyread0;
     rt_uint32_t sys_toyread1;
-    rt_uint32_t sys_rtcread0;    
+    rt_uint32_t sys_rtcread0;
 };
 typedef struct rtctime rtctime_t;
 
 void pr_time(struct tm *time)
 {
-    rt_kprintf(" tm_sec: [%d]\n", time->tm_sec);
-    rt_kprintf(" tm_min: [%d]\n", time->tm_min);
-    rt_kprintf("tm_hour: [%d]\n", time->tm_hour);
-    rt_kprintf("tm_mday: [%d]\n", time->tm_mday);
-    rt_kprintf(" tm_mon: [%d]\n", time->tm_mon);
-    rt_kprintf("tm_year: [%d]\n", time->tm_year);
+    static int cnt = 0;
+
+    rt_kprintf("tm_year - tm_mon - tm_mday %d-%d-%d\n",
+                time->tm_year, time->tm_mon, time->tm_mday);
+    rt_kprintf("tm_hour:tm_min:tm_sec [%d:%d:%d] \n",
+                time->tm_hour, time->tm_min, time->tm_sec);
 }
 
-rtctime_t mkrtctime(struct tm *tm)
-{
-    rtctime_t rtctm;
 
-    rtctm.sys_toyread0   = tm->tm_mon + 1;
-    rtctm.sys_toyread0 <<= 31 - 26 + 1;
-
-    rtctm.sys_toyread0  |= tm->tm_mday;
-    rtctm.sys_toyread0 <<= 25 - 21 + 1;
-
-    rtctm.sys_toyread0  |= tm->tm_hour;
-    rtctm.sys_toyread0 <<= 20 - 16 + 1;
-
-    rtctm.sys_toyread0  |= tm->tm_min;
-    rtctm.sys_toyread0 <<= 15 - 10 + 1;
-
-    rtctm.sys_toyread0  |= tm->tm_sec;
-    rtctm.sys_toyread0 <<= 9 - 4 + 1;
-    /* Fixme: 0.1 second */
-    rtctm.sys_toyread0  |= 0;
-
-    rtctm.sys_toyread1 = tm->tm_year;
-    rtctm.sys_toyread1 += 1900;
-
-    return rtctm;
-}
 struct tm *localrtctime(const rtctime_t *rtctp)
 {
     static struct tm time;
@@ -90,17 +65,54 @@ struct tm *localrtctime(const rtctime_t *rtctp)
     time.tm_hour  = BF(rtctp->sys_toyread0, 20, 16);
     time.tm_mday  = BF(rtctp->sys_toyread0, 21, 25);
     time.tm_mon   = BF(rtctp->sys_toyread0, 26, 31);
-    time.tm_year  = BF(rtctp->sys_toyread1,  0, 31);
 //  time.tm_isdst = 0;
 //  time.tm_wday  = 0;
 //  time.tm_yday  = 0;
 
     time.tm_mon  -= 1;
-    time.tm_year -= 1900;
 
-    pr_time(&time);
+    time.tm_year  = rtctp->sys_toyread1;
 
     return &time;
+}
+
+
+rtctime_t mkrtctime(struct tm *tm)
+{
+    rtctime_t rtctm;
+    struct tm tmptime;
+
+
+    rt_kprintf("%s %d\n", __func__, __LINE__);
+    pr_time(tm);
+
+
+    rtctm.sys_toyread0 <<= 31 - 26 + 1;
+    rtctm.sys_toyread0   = tm->tm_mon + 1;
+
+
+    rtctm.sys_toyread0 <<= 25 - 21 + 1;
+    rtctm.sys_toyread0  |= tm->tm_mday;
+
+    rtctm.sys_toyread0 <<= 20 - 16 + 1;
+    rtctm.sys_toyread0  |= tm->tm_hour;
+
+    rtctm.sys_toyread0 <<= 15 - 10 + 1;
+    rtctm.sys_toyread0  |= tm->tm_min;
+
+    rtctm.sys_toyread0 <<= 9 - 4 + 1;
+    rtctm.sys_toyread0  |= tm->tm_sec;
+    /* Fixme: 0.1 second */
+    rtctm.sys_toyread0 <<= 3 - 0 + 1;
+    rtctm.sys_toyread0  |= 0;
+
+    rtctm.sys_toyread1 = tm->tm_year;
+
+    rt_kprintf("%s %d\n", __func__, __LINE__);
+    tmptime = *localrtctime(&rtctm);
+    pr_time(&tmptime);
+
+    return rtctm;
 }
 
 
@@ -120,7 +132,7 @@ void hw_rtc_dump(void)
     rt_kprintf("3.   [%p]: DEC[%10d], HEX[%8x]\n", & hw_rtc->sys_rtcread0, t, t);
 
     rt_kprintf("-------------------\n");
-  
+
 }
 
 
@@ -142,57 +154,63 @@ static rt_err_t rt_rtc_ioctl(rt_device_t dev, int cmd, void *args)
 {
     rt_err_t err = RT_ENOSYS;
 
+    static int count = 0;
+
     struct loongson_rtc *hw_rtc;
     rtctime_t rtctm;
-
-    
-
-    static struct tm faketm;
     struct tm time;
+    struct tm tmptime;
     time_t *t;
+
+    rt_kprintf("---------------------------------\n");
+
 
     hw_rtc = dev->user_data;
 
     t = (time_t *)args;
+    time = *localtime(t);
+
+    rtctm.sys_toyread0 = hw_rtc->sys_toyread0;
+    rtctm.sys_toyread1 = hw_rtc->sys_toyread1;
+    rtctm.sys_rtcread0 = hw_rtc->sys_rtcread0;
+    tmptime = *localrtctime(&rtctm);
+
+    pr_time(&time);
+
 
     switch (cmd) {
 
     case RT_DEVICE_CTRL_RTC_GET_TIME:
-        rtctm.sys_toyread0 = hw_rtc->sys_toyread0;
-        rtctm.sys_toyread1 = hw_rtc->sys_toyread1;
-        time = *localrtctime(&rtctm);
-        *t = mktime(&time);
-      rt_kprintf("RT_DEVICE_CTRL_RTC_GET_TIME\n");
-      hw_rtc_dump();
+        *t = mktime(&tmptime);
+        rt_kprintf("RT_DEVICE_CTRL_RTC_GET_TIME\n");
     break;
 
     case RT_DEVICE_CTRL_RTC_SET_TIME:
-        time = *localtime(t);
-        pr_time(&time);
-        rtctm = mkrtctime(&time);
-        hw_rtc->sys_toywrite0 = rtctm.sys_toyread0;
-        hw_rtc->sys_toywrite1 = rtctm.sys_toyread1;
-        rt_kprintf("RT_DEVICE_CTRL_RTC_SET_TIME\n");
-        hw_rtc_dump();
-        
-        /* store `time' to hw_rtc */
-//      rt_kprintf("DATE: mon[%d] mday[%d]\n", time.tm_mon+1, time.tm_mday);
-//      rt_kprintf("TIME: %d:%d:%d\n", time.tm_hour, time.tm_min, time.tm_sec);
-    break;
+            tmptime.tm_hour = time.tm_hour;
+            tmptime.tm_min  = time.tm_min;
+            tmptime.tm_sec  = time.tm_sec;
+
+            tmptime.tm_year = time.tm_year;
+            tmptime.tm_mon  = time.tm_mon;
+            tmptime.tm_mday = time.tm_mday;
+
+            rtctm = mkrtctime(&tmptime);
+            /* write to hw RTC */
+            hw_rtc->sys_toywrite0 = rtctm.sys_toyread0;
+            hw_rtc->sys_toywrite1 = rtctm.sys_toyread1;
+            rt_kprintf("RT_DEVICE_CTRL_RTC_SET_TIME\n");
+        break;
 
     case RT_DEVICE_CTRL_RTC_GET_ALARM:
         rt_kprintf("RT_DEVICE_CTRL_RTC_GET_ALARM\n");
-        hw_rtc_dump();
     break;
 
     case RT_DEVICE_CTRL_RTC_SET_ALARM:
         rt_kprintf("RT_DEVICE_CTRL_RTC_SET_ALARM\n");
-        hw_rtc_dump();
     break;
 
     default:
         rt_kprintf("ENOSYS\n");
-        hw_rtc_dump();
     break;
     }
 
@@ -214,7 +232,7 @@ int rt_hw_rtc_init(void)
     };
 
     rt_kprintf("%s\n", __func__);
-    
+
     /* need initial operation ? */
 
     rt_device_register(&rtc, "rtc", RT_DEVICE_FLAG_RDWR);
