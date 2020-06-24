@@ -13,14 +13,21 @@
 #define RT_USING_PWM
 #ifdef RT_USING_PWM
 
+struct rt_device_pwm loongson_pwm = {
+    .ops = NULL,
+};
+
+struct rt_pwm_ops loongson_ops = {
+    .control = NULL,
+};
 
 int loongson_pwm_init(void)
 {
     int rc = RT_EOK;
 
-   // rc = rt_device_pwm_register(struct rt_device_pwm *device, const char *name, const struct rt_pwm_ops *ops, const void *user_data)
-    for(rc = 0; rc < 100; rc++)
-        rt_kprintf("%s\n", __func__);;
+    rc = rt_device_pwm_register(&loongson_pwm, "pwm0", &loongson_ops, NULL);
+    rt_kprintf("Hello PWM [skeleton].\n");
+
     return rc;
 }
 INIT_DEVICE_EXPORT(loongson_pwm_init);
