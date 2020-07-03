@@ -9,30 +9,31 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
+#include <ls2k1000.h>
 
-#define RT_USING_PWM
 #ifdef RT_USING_PWM
 
+#define PWM0_BASE   (0xFFFFFFFFBFe02000)
+#define PWM1_BASE   (0xFFFFFFFFBFe02010)
+#define PWM2_BASE   (0xFFFFFFFFBFe02020)
+#define PWM3_BASE   (0xFFFFFFFFBFe02030)
+
+#define CTRL_EN     (1UL<<0)
+#define CTRL_OE     (1UL<<3)
+#define CTRL_SINGL  (1UL<<4)
+#define CTRL_INTE   (1UL<<5)
+#define CTRL_INT    (1UL<<6)
+#define CTRL_RST    (1UL<<7)
+#define CTRL_CAPTE  (1UL<<8)
+#define CTRL_INVERT (1UL<<9)
+#define CTRL_DZONE  (1UL<<10)
+
 struct loongson_pwm {
-    rt_uint32_t __pad;
+    rt_uint32_t __PAD0;
     rt_uint32_t low_buffer;
     rt_uint32_t full_buffer;
     rt_uint32_t ctrl;
 };
-
-//#define LS2K_GEN_CONFIG0_REG            (LS2K_CHIP_CFG_REG_BASE + 0x420)
-
-#define GEN_CONFIG0_REG 0xFFFFFFFFBfe10420
-
-#define CTRL_EN      (1UL<<0)
-#define CTRL_OE      (1UL<<3)
-#define CTRL_SINGL   (1UL<<4)
-#define CTRL_INTE    (1UL<<5)
-#define CTRL_INT     (1UL<<6)
-#define CTRL_RST     (1UL<<7)
-#define CTRL_CAPTE   (1UL<<8)
-#define CTRL_INVERT  (1UL<<9)
-#define CTRL_DZONE   (1UL<<10)
 
 rt_err_t loongson_pwm_enable(struct rt_device_pwm *device, int channel)
 {
@@ -41,27 +42,15 @@ rt_err_t loongson_pwm_enable(struct rt_device_pwm *device, int channel)
     volatile rt_uint64_t *config0;
     rt_uint64_t m;
 
-    config0 = (void *)GEN_CONFIG0_REG;
-    priv = device->parent.user_data;
-
     channel %= 4;
-    chip = (void *)priv[channel];
-    m = 0x1000ULL << channel;
 
-    m = 0xf000;
-    rt_kprintf("enable all\n");
-
+    config0 = (void *)GEN_CONFIG0_REG;
+    m = 1ULL << 12 << channel;
     *config0 |= m;
 
+    priv = device->parent.user_data;
+    chip = (void *)priv[channel];
     chip->ctrl = CTRL_EN;
-
-    rt_kprintf("confxig:%x\n", *config0);
-    rt_kprintf("chip->__pad:[%d]\n", chip->__pad);
-    rt_kprintf("chip->ctrl:[%p] [%x]\n", &chip->ctrl), chip->ctrl;
-
-
-//  rt_kprintf("priv: %p, %p, %p\n", priv[1], priv[2], priv[0]);
-//  rt_kprintf("priv:[%p], channel:[%d]\n", device, channel);
 
     return RT_EOK;
 }
@@ -69,55 +58,28 @@ rt_err_t loongson_pwm_enable(struct rt_device_pwm *device, int channel)
 rt_err_t loongson_pwm_disable(struct rt_device_pwm *device, int channel)
 {
     struct loongson_pwm **chip;
-    volatile rt_uint64_t *config0;
     rt_uint64_t m;
 
-    config0 = (void *)GEN_CONFIG0_REG;
     chip = device->parent.user_data;
-
     channel %= 4;
     chip[channel]->ctrl &= ~CTRL_EN;
 
-    m = 0x1000ULL << channel;
-    *config0 &= ~m;
-
-    rt_kprintf("%s: channel[%d]\n", __func__, channel);
-    rt_kprintf("%p\n", chip[channel]);
     return RT_EOK;
 }
 
 rt_err_t loongson_pwm_set(struct rt_device_pwm *device, int channel, rt_uint32_t period, rt_uint32_t pulse)
 {
-    rt_uint32_t **priv;
     struct loongson_pwm *chip;
+    rt_uint32_t **priv;
 
     priv = device->parent.user_data;
     channel %= 4;
     chip = (void *)priv[channel];
 
-    chip->full_buffer = period;
-    chip->low_buffer  = pulse;
-
-    rt_uint32_t ctrl;
-    ctrl = chip->ctrl;
-
-    rt_kprintf("ctrl: [%08x]\n", ctrl);
-
-    if(ctrl & CTRL_EN) rt_kprintf("CTRL_EN\n");
-    if(ctrl & CTRL_OE) rt_kprintf("CTRL_OE\n");
-    if(ctrl & CTRL_SINGL) rt_kprintf("CTRL_SINGL\n");
-    if(ctrl & CTRL_INTE) rt_kprintf("CTRL_INTE\n");
-    if(ctrl & CTRL_INT) rt_kprintf("CTRL_INT\n");
-    if(ctrl & CTRL_RST) rt_kprintf("CTRL_RST\n");
-    if(ctrl & CTRL_CAPTE) rt_kprintf("CTRL_CAPTE\n");
-    if(ctrl & CTRL_INVERT) rt_kprintf("CTRL_INVERT\n");
-    if(ctrl & CTRL_DZONE) rt_kprintf("CTRL_DZONE\n");
-
-    rt_kprintf("%s: channel[%d] period[%d], pulse[%d]\n", __func__, channel, period, pulse);
-    rt_kprintf("%p\n", chip);
-
-    rt_kprintf("chip->full_buffer: %p\n", &chip->full_buffer);
-    rt_kprintf("chip->low_buffer : %p\n", &chip->low_buffer);
+    chip->ctrl       &= ~CTRL_EN;
+    chip->full_buffer =  period;
+    chip->low_buffer  =  pulse;
+    chip->ctrl       |=  CTRL_EN;
 
     return RT_EOK;
 }
@@ -131,19 +93,15 @@ static rt_err_t loongson_pwm_ioctl(struct rt_device_pwm *device, int cmd, void *
 
     switch (cmd) {
     case PWM_CMD_ENABLE:
-        rt_kprintf("PWM_CMD_ENABLE\n");
         rc = loongson_pwm_enable(device, cfg->channel);
         break;
     case PWM_CMD_DISABLE:
-        rt_kprintf("PWM_CMD_DISABLE\n");
         rc = loongson_pwm_disable(device, cfg->channel);
         break;
     case PWM_CMD_SET:
-        rt_kprintf("PWM_CMD_SET\n");
         rc = loongson_pwm_set(device, cfg->channel, cfg->period, cfg->pulse);
         break;
     case PWM_CMD_GET:
-        rt_kprintf("PWM_CMD_GET\n");
         rc = RT_ENOSYS;
         break;
     default:
@@ -161,37 +119,16 @@ struct rt_device_pwm loongson_pwm = {
     .ops = &loongson_pwm_ops,
 };
 
-#define LS2K_IO_REG_BASE                0xFFFFFFFFBf000000
-/* PWM regs */
-#define LS2K_PWM_REG_BASE               (LS2K_IO_REG_BASE + 0x00e02000)
-#define LS2K_PWM0_REG_BASE              (LS2K_PWM_REG_BASE + 0x00)
-#define LS2K_PWM1_REG_BASE              (LS2K_PWM_REG_BASE + 0x10)
-#define LS2K_PWM2_REG_BASE              (LS2K_PWM_REG_BASE + 0X20)
-#define LS2K_PWM3_REG_BASE              (LS2K_PWM_REG_BASE + 0X30)
-
-
-#define LS2K_PWM0_REG_BASE              (0xFFFFFFFFBFe02000)
-#define LS2K_PWM1_REG_BASE              (0xFFFFFFFFBFe02010)
-#define LS2K_PWM2_REG_BASE              (0xFFFFFFFFBFe02020)
-#define LS2K_PWM3_REG_BASE              (0xFFFFFFFFBFe02030)
-
-
-
 int loongson_pwm_init(void)
 {
     int rc = RT_EOK;
     static rt_uint32_t *priv[] = {
-        (void *)LS2K_PWM0_REG_BASE,
-        (void *)LS2K_PWM1_REG_BASE,
-        (void *)LS2K_PWM2_REG_BASE,
-        (void *)LS2K_PWM3_REG_BASE
+        (void *)PWM0_BASE,
+        (void *)PWM1_BASE,
+        (void *)PWM2_BASE,
+        (void *)PWM3_BASE
     };
-
-    // default GPIO input.
-
     rc = rt_device_pwm_register(&loongson_pwm, "pwm0", &loongson_pwm_ops, &priv);
-    rt_kprintf("Hello PWM [skeleton].\n");
-
     return rc;
 }
 INIT_DEVICE_EXPORT(loongson_pwm_init);

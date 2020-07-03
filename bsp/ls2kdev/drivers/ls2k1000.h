@@ -21,6 +21,9 @@
 #define GPIO_BASE    0xFFFFFFFFBFE10500
 #define PLL_SYS_BASE 0xFFFFFFFFBFE10480
 
+#define GEN_CONFIG0_REG 0xFFFFFFFFBfe10420
+
+
 void rt_hw_timer_handler(void);
 void rt_hw_uart_init(void);
 
