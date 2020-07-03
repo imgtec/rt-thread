@@ -14,6 +14,7 @@
 #ifdef RT_USING_PWM
 
 struct loongson_pwm {
+    rt_uint32_t __pad;
     rt_uint32_t low_buffer;
     rt_uint32_t full_buffer;
     rt_uint32_t ctrl;
@@ -38,17 +39,26 @@ rt_err_t loongson_pwm_enable(struct rt_device_pwm *device, int channel)
     int **priv;
     struct loongson_pwm *chip;
     volatile rt_uint64_t *config0;
-    rt_uint32_t m;
+    rt_uint64_t m;
 
     config0 = (void *)GEN_CONFIG0_REG;
     priv = device->parent.user_data;
 
     channel %= 4;
     chip = (void *)priv[channel];
-    m = 1ULL << 12 << channel;
+    m = 0x1000ULL << channel;
+
+    m = 0xf000;
+    rt_kprintf("enable all\n");
+
     *config0 |= m;
 
-    chip->ctrl |= CTRL_EN;
+    chip->ctrl = CTRL_EN;
+
+    rt_kprintf("confxig:%x\n", *config0);
+    rt_kprintf("chip->__pad:[%d]\n", chip->__pad);
+    rt_kprintf("chip->ctrl:[%p] [%x]\n", &chip->ctrl), chip->ctrl;
+
 
 //  rt_kprintf("priv: %p, %p, %p\n", priv[1], priv[2], priv[0]);
 //  rt_kprintf("priv:[%p], channel:[%d]\n", device, channel);
@@ -60,15 +70,15 @@ rt_err_t loongson_pwm_disable(struct rt_device_pwm *device, int channel)
 {
     struct loongson_pwm **chip;
     volatile rt_uint64_t *config0;
-    rt_uint32_t m;
+    rt_uint64_t m;
 
     config0 = (void *)GEN_CONFIG0_REG;
     chip = device->parent.user_data;
 
-    channel %= 4; 
+    channel %= 4;
     chip[channel]->ctrl &= ~CTRL_EN;
 
-    m = 1ULL << 12 << channel;
+    m = 0x1000ULL << channel;
     *config0 &= ~m;
 
     rt_kprintf("%s: channel[%d]\n", __func__, channel);
@@ -88,9 +98,26 @@ rt_err_t loongson_pwm_set(struct rt_device_pwm *device, int channel, rt_uint32_t
     chip->full_buffer = period;
     chip->low_buffer  = pulse;
 
-    
+    rt_uint32_t ctrl;
+    ctrl = chip->ctrl;
+
+    rt_kprintf("ctrl: [%08x]\n", ctrl);
+
+    if(ctrl & CTRL_EN) rt_kprintf("CTRL_EN\n");
+    if(ctrl & CTRL_OE) rt_kprintf("CTRL_OE\n");
+    if(ctrl & CTRL_SINGL) rt_kprintf("CTRL_SINGL\n");
+    if(ctrl & CTRL_INTE) rt_kprintf("CTRL_INTE\n");
+    if(ctrl & CTRL_INT) rt_kprintf("CTRL_INT\n");
+    if(ctrl & CTRL_RST) rt_kprintf("CTRL_RST\n");
+    if(ctrl & CTRL_CAPTE) rt_kprintf("CTRL_CAPTE\n");
+    if(ctrl & CTRL_INVERT) rt_kprintf("CTRL_INVERT\n");
+    if(ctrl & CTRL_DZONE) rt_kprintf("CTRL_DZONE\n");
+
     rt_kprintf("%s: channel[%d] period[%d], pulse[%d]\n", __func__, channel, period, pulse);
     rt_kprintf("%p\n", chip);
+
+    rt_kprintf("chip->full_buffer: %p\n", &chip->full_buffer);
+    rt_kprintf("chip->low_buffer : %p\n", &chip->low_buffer);
 
     return RT_EOK;
 }
@@ -141,6 +168,14 @@ struct rt_device_pwm loongson_pwm = {
 #define LS2K_PWM1_REG_BASE              (LS2K_PWM_REG_BASE + 0x10)
 #define LS2K_PWM2_REG_BASE              (LS2K_PWM_REG_BASE + 0X20)
 #define LS2K_PWM3_REG_BASE              (LS2K_PWM_REG_BASE + 0X30)
+
+
+#define LS2K_PWM0_REG_BASE              (0xFFFFFFFFBFe02000)
+#define LS2K_PWM1_REG_BASE              (0xFFFFFFFFBFe02010)
+#define LS2K_PWM2_REG_BASE              (0xFFFFFFFFBFe02020)
+#define LS2K_PWM3_REG_BASE              (0xFFFFFFFFBFe02030)
+
+
 
 int loongson_pwm_init(void)
 {
